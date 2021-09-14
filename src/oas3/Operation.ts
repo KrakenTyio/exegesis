@@ -118,7 +118,7 @@ export default class Operation {
         this.exegesisController = oaOperation[EXEGESIS_CONTROLLER] || exegesisController;
         this.operationId = oaOperation[EXEGESIS_OPERATION_ID] || oaOperation.operationId;
 
-        this.securityRequirements = (oaOperation.security || context.openApiDoc.security || []);
+        this.securityRequirements = (oaOperation.security || oaPath.security || context.openApiDoc.security || []);
 
         this._securitySchemes = new SecuritySchemes(context.openApiDoc);
 
