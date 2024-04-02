@@ -103,5 +103,8 @@
   "engines": {
     "node": ">=6.0.0",
     "npm": ">5.0.0"
+  },
+  "resolutions": {
+    "@types/mime": "3.0.4"
   }
 }
