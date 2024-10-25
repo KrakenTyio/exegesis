@@ -7,7 +7,7 @@ export class ExtendableError extends Error {
         if (typeof Error.captureStackTrace === 'function') {
             Error.captureStackTrace(this, this.constructor);
         } else {
-            this.stack = (new Error(message)).stack;
+            this.stack = new Error(message).stack;
         }
     }
 }
@@ -30,10 +30,8 @@ export class HttpBadRequestError extends HttpError {
 export class ValidationError extends HttpBadRequestError {
     errors: IValidationError[];
 
-    constructor(
-        errors: IValidationError[] | IValidationError
-    ) {
-        if(!Array.isArray(errors)) {
+    constructor(errors: IValidationError[] | IValidationError) {
+        if (!Array.isArray(errors)) {
             errors = [errors];
         }
         super(errors.length === 1 ? errors[0].message : 'Multiple validation errors');
@@ -50,5 +48,20 @@ export class HttpNotFoundError extends HttpError {
 export class HttpPayloadTooLargeError extends HttpError {
     constructor(message: string) {
         super(413, message);
+    }
+}
+
+/**
+ * Ensures the passed in `err` is of type Error.
+ */
+export function asError(err: any): Error {
+    if (err instanceof Error) {
+        return err;
+    } else {
+        const newErr = new Error(err);
+        if (err.status) {
+            (newErr as any).status = err.status;
+        }
+        return newErr;
     }
 }
