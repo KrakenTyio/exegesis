@@ -49,7 +49,7 @@ export function loadControllersSync(
                     result[indexFolder] = result[indexFolder] || mod;
                 }
             } catch(err) {
-                throw new Error(`Could not load controller '${fullPath}': ${err.message}`);
+                throw new Error(`Could not load controller '${fullPath}': ${(err as Error).message}`);
             }
             return result;
         },

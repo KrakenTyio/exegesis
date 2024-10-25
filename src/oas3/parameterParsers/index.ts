@@ -63,7 +63,7 @@ function generateMediaTypeParser(
         } catch (err) {
             throw new ValidationError({
                 message: `Error parsing parameter ${location.name} of ` +
-                    `type ${parameterDescriptor.contentType}: ${err.message}`,
+                    `type ${parameterDescriptor.contentType}: ${(err as Error).message}`,
                 location
             });
         }
