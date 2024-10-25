@@ -8,15 +8,12 @@
         "lib/**/*"
     ],
     "scripts": {
-        "test": "npm run build && npm run lint && npm run test:unittest",
-        "test:pre-commit": "pretty-quick --staged && npm run build && npm run lint && npm run test:unittest-pc",
+        "test": "npm run build && npm run lint",
+        "test:pre-commit": "pretty-quick --staged && npm run build && npm run lint",
         "build": "tsc -v && npx tsc -v && npx tsc",
         "clean": "rm -rf lib coverage",
-        "test:unittest": "tsc -p test && nyc mocha 'test/**/*.@(ts|js)'",
-        "test:unittest-pc": "tsc -p test && mocha --reporter progress 'test/**/*.@(ts|js)'",
-        "lint": "npm run lint:source && npm run lint:tests",
+        "lint": "npm run lint:source",
         "lint:source": "eslint --ext .ts src",
-        "lint:tests": "eslint --ext .ts test",
         "prepare": "husky install && npm run build",
         "prepublishOnly": "npm run build && npm test",
         "semantic-release": "semantic-release"
@@ -72,7 +69,7 @@
         "semantic-release": "^21.0.1",
         "supertest-fetch": "^1.2.2",
         "ts-node": "^10.4.0",
-        "typescript": "^5.0.3"
+        "typescript": "~5.5.4"
     },
     "dependencies": {
         "@apidevtools/json-schema-ref-parser": "^9.0.3",

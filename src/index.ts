@@ -14,6 +14,7 @@ import {
     MiddlewareFunction,
     OAS3ApiInfo,
 } from './types';
+
 export { HttpError, ValidationError } from './errors';
 import { OpenAPIObject } from 'openapi3-ts';
 import { Context as KoaContext } from 'koa';
@@ -213,24 +214,19 @@ export function compileApi(
         const runner = await compileRunner(openApiDoc, options);
 
         return async function exegesisMiddleware(ctx: KoaContext, next?: Callback<void>) {
-            try {
-                const result = await runner(ctx.req, ctx.res, ctx);
-                if (!result) {
-                    if (next) {
-                        await next();
-                    }
-                } else if (ctx.headerSent) {
-                    // Someone else has already written a response.  :(
-                } else if (result) {
-                    await writeHttpResult(result, ctx);
-                } else {
-                    if (next) {
-                        await next();
-                    }
+            const result = await runner(ctx.req, ctx.res, ctx);
+            if (!result) {
+                if (next) {
+                    await next();
                 }
-            } catch (err) {
-                throw err;
-                // return ctx.throw(err.status || 500, err.message);
+            } else if (ctx.headerSent) {
+                // Someone else has already written a response.  :(
+            } else if (result) {
+                await writeHttpResult(result, ctx);
+            } else {
+                if (next) {
+                    await next();
+                }
             }
         };
     });
