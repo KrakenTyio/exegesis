@@ -8,27 +8,38 @@ import { ParameterParser, generateParser } from './parameterParsers';
 import * as urlEncodedBodyParser from './urlEncodedBodyParser';
 import { ExegesisCompiledOptions } from '../options';
 
-const DEFAULT_STYLE : {[style: string]: string} = {
+const DEFAULT_STYLE: { [style: string]: string } = {
     path: 'simple',
     query: 'form',
     cookie: 'form',
-    header: 'simple'
+    header: 'simple',
 };
 
-function getDefaultExplode(style: string) : boolean {
+function getDefaultExplode(style: string): boolean {
     return style === 'form';
 }
 
-function generateSchemaParser(self: Parameter, schema: JSONSchema4 | JSONSchema6, options: ExegesisCompiledOptions) {
-    const styleInConfig = options.paramStyle && self.oaParameter.in in options.paramStyle &&
+function generateSchemaParser(
+    self: Parameter,
+    schema: JSONSchema4 | JSONSchema6,
+    options: ExegesisCompiledOptions
+) {
+    const styleInConfig =
+        options.paramStyle &&
+        self.oaParameter.in in options.paramStyle &&
         options.paramStyle[self.oaParameter.in];
     const style = self.oaParameter.style || styleInConfig || DEFAULT_STYLE[self.oaParameter.in];
 
-    const explodeInConfig = options.paramExplode && self.oaParameter.in in options.paramExplode &&
+    const explodeInConfig =
+        options.paramExplode &&
+        self.oaParameter.in in options.paramExplode &&
         options.paramExplode[self.oaParameter.in];
-    const explode = (self.oaParameter.explode === null || self.oaParameter.explode === undefined)
-        ? typeof explodeInConfig === 'boolean' ? explodeInConfig : getDefaultExplode(style)
-        : self.oaParameter.explode;
+    const explode =
+        self.oaParameter.explode === null || self.oaParameter.explode === undefined
+            ? typeof explodeInConfig === 'boolean'
+                ? explodeInConfig
+                : getDefaultExplode(style)
+            : self.oaParameter.explode;
     const allowReserved = self.oaParameter.allowReserved || false;
 
     return generateParser({
@@ -36,7 +47,7 @@ function generateSchemaParser(self: Parameter, schema: JSONSchema4 | JSONSchema6
         style,
         explode,
         allowReserved,
-        schema
+        schema,
     });
 }
 
@@ -53,31 +64,32 @@ export default class Parameter {
     readonly name: string;
     readonly parser: ParameterParser;
 
-    constructor(context: Oas3CompileContext, oaParameter: oas3.ParameterObject | oas3.ReferenceObject) {
+    constructor(
+        context: Oas3CompileContext,
+        oaParameter: oas3.ParameterObject | oas3.ReferenceObject
+    ) {
         const resOaParameter = isReferenceObject(oaParameter)
-            ? context.resolveRef(oaParameter.$ref) as oas3.ParameterObject
+            ? (context.resolveRef(oaParameter.$ref) as oas3.ParameterObject)
             : oaParameter;
 
         this.location = {
             in: resOaParameter.in,
             name: resOaParameter.name,
             docPath: context.jsonPointer,
-            path: ''
+            path: '',
         };
         this.name = resOaParameter.name;
 
         this.context = context;
         this.oaParameter = resOaParameter;
-        this.validate = (value) => ({errors: null, value});
+        this.validate = (value) => ({ errors: null, value });
 
         // Find the schema for this parameter.
-        if(resOaParameter.schema) {
+        if (resOaParameter.schema) {
             const schemaContext = context.childContext('schema');
-            const schema = extractSchema(
-                context.openApiDoc,
-                schemaContext.jsonPointer,
-                {resolveRef: context.resolveRef.bind(context)}
-            );
+            const schema = extractSchema(context.openApiDoc, schemaContext.jsonPointer, {
+                resolveRef: context.resolveRef.bind(context),
+            });
             this.parser = generateSchemaParser(this, schema, context.options);
             this.validate = generateRequestValidator(
                 schemaContext,
@@ -85,8 +97,7 @@ export default class Parameter {
                 resOaParameter.required || false,
                 'application/x-www-form-urlencoded'
             );
-
-        } else if(resOaParameter.content) {
+        } else if (resOaParameter.content) {
             // `parameter.content` must have exactly one key
             const mediaTypeString = Object.keys(resOaParameter.content)[0];
             const oaMediaType = resOaParameter.content[mediaTypeString];
@@ -95,13 +106,19 @@ export default class Parameter {
             let parser = context.options.parameterParsers.get(mediaTypeString);
 
             // OAS3 has special handling for 'application/x-www-form-urlencoded'.
-            if(!parser && mediaTypeString === 'application/x-www-form-urlencoded') {
-                parser = urlEncodedBodyParser.generateStringParser(mediaTypeContext, oaMediaType, this.location);
+            if (!parser && mediaTypeString === 'application/x-www-form-urlencoded') {
+                parser = urlEncodedBodyParser.generateStringParser(
+                    mediaTypeContext,
+                    oaMediaType,
+                    this.location
+                );
             }
 
-            if(!parser) {
-                throw new Error('Unable to find suitable mime type parser for ' +
-                    `type ${mediaTypeString} in ${context.jsonPointer}/content`);
+            if (!parser) {
+                throw new Error(
+                    'Unable to find suitable mime type parser for ' +
+                        `type ${mediaTypeString} in ${context.jsonPointer}/content`
+                );
             }
 
             // FIXME: We don't handle 'application/x-www-form-urlencoded' here
@@ -111,10 +128,10 @@ export default class Parameter {
                 schema: oaMediaType.schema,
                 contentType: mediaTypeString,
                 parser,
-                uriEncoded: ['query', 'path'].includes(resOaParameter.in)
+                uriEncoded: ['query', 'path'].includes(resOaParameter.in),
             });
 
-            if(oaMediaType.schema) {
+            if (oaMediaType.schema) {
                 this.validate = generateRequestValidator(
                     mediaTypeContext.childContext('schema'),
                     this.location,
@@ -123,8 +140,9 @@ export default class Parameter {
                 );
             }
         } else {
-            throw new Error(`Parameter ${resOaParameter.name} should have a 'schema' or a 'content'`);
+            throw new Error(
+                `Parameter ${resOaParameter.name} should have a 'schema' or a 'content'`
+            );
         }
-
     }
 }

@@ -3,19 +3,25 @@ import traveseSchema from 'json-schema-traverse';
 import * as jsonPaths from './jsonPaths';
 import * as jsonPtr from 'json-ptr';
 import { JSONSchema6, JSONSchema4 } from 'json-schema';
-import {resolveRef} from './json-schema-resolve-ref';
+import { resolveRef } from './json-schema-resolve-ref';
 
 function extractSchemaPriv(
     subtreeRef: string,
     refResolver: (ref: string) => any | undefined,
     options: {
-        skipUnknownRefs?: boolean
+        skipUnknownRefs?: boolean;
     },
-    context?: {result: any, replaced: any, schemaCount: number, rootSubtreeRef: string}
-) : JSONSchema4 | JSONSchema6 {
+    context?: {
+        result: any;
+        replaced: any;
+        replacements: string[];
+        schemaCount: number;
+        rootSubtreeRef: string;
+    }
+): JSONSchema4 | JSONSchema6 {
     const subtreeObject = refResolver(subtreeRef);
 
-    if(!subtreeObject) {
+    if (!subtreeObject) {
         throw new Error(`Could not find ref ${subtreeRef}`);
     }
 
@@ -23,38 +29,59 @@ function extractSchemaPriv(
     const ctx = context || {
         result: result,
         replaced: {},
+        replacements: [],
         schemaCount: 0,
-        rootSubtreeRef: subtreeRef
+        rootSubtreeRef: subtreeRef,
     };
 
-    traveseSchema(result, (
-        schema: any
-    ) => {
-        if(schema.$ref && typeof(schema.$ref) === 'string') {
-            if(ctx.replaced[schema.$ref]) {
+    traveseSchema(result, (schema: any) => {
+        if (schema.$ref && typeof schema.$ref === 'string') {
+            if (ctx.replaced[schema.$ref]) {
                 schema.$ref = ctx.replaced[schema.$ref];
-            } else if(jsonPaths.jsonPointerStartsWith(schema.$ref, ctx.rootSubtreeRef + '/')) {
-                ctx.replaced[schema.$ref] = jsonPaths.jsonPointerStripPrefix(schema.$ref, ctx.rootSubtreeRef);
+            } else if (jsonPaths.jsonPointerStartsWith(schema.$ref, ctx.rootSubtreeRef + '/')) {
+                ctx.replaced[schema.$ref] = jsonPaths.jsonPointerStripPrefix(
+                    schema.$ref,
+                    ctx.rootSubtreeRef
+                );
                 schema.$ref = ctx.replaced[schema.$ref];
-            } else if(!refResolver(schema.$ref)) {
+            } else if (!refResolver(schema.$ref)) {
                 // Don't know how to resolve this ref
-                if(!options.skipUnknownRefs) {
+                if (!options.skipUnknownRefs) {
                     throw new Error(`Can't find ref ${schema.$ref}`);
                 }
             } else {
                 ctx.result.definitions = ctx.result.definitions || {};
 
                 // Find a name to store this under in 'definitions'.
+                //
+                // Because we try to pick a "sensible" name for the new definition,
+                // when we recurse into `extractSchemaPriv` below, if there's a child
+                // schema with the same name as the one we just picked, we could
+                // end up accidentally giving two different schemas the same name
+                // and clobbering one with the other.  To avoid this, we record
+                // all the `newRefSuffix`es we pick in `ctx.replacements`, and
+                // then we can make sure this doesn't happen.
                 const origRef = schema.$ref;
-                const jsonPath = jsonPtr.decode(schema.$ref);
-                let newRefSuffix : string | undefined = jsonPath.length > 0 ? jsonPath[jsonPath.length - 1] : undefined;
-                while(!newRefSuffix || ctx.result.definitions[newRefSuffix]) {
+                const jsonPath = jsonPtr.JsonPointer.decode(schema.$ref);
+                let newRefSuffix: string | undefined =
+                    jsonPath.length > 0 ? `${jsonPath[jsonPath.length - 1]}` : undefined;
+                while (
+                    !newRefSuffix ||
+                    ctx.result.definitions[newRefSuffix] ||
+                    ctx.replacements.includes(newRefSuffix)
+                ) {
                     newRefSuffix = `schema${ctx.schemaCount++}`;
                 }
+                ctx.replacements.push(newRefSuffix);
 
                 // Do the replacement.
                 schema.$ref = ctx.replaced[schema.$ref] = `#/definitions/${newRefSuffix}`;
-                ctx.result.definitions[newRefSuffix] = extractSchemaPriv(origRef, refResolver, options, ctx);
+                ctx.result.definitions[newRefSuffix] = extractSchemaPriv(
+                    origRef,
+                    refResolver,
+                    options,
+                    ctx
+                );
             }
         }
     });
@@ -79,10 +106,10 @@ export function extractSchema(
     document: any,
     subtreeRef: string,
     options: {
-        resolveRef?: (ref: string) => any | undefined
-        skipUnknownRefs?: boolean
+        resolveRef?: (ref: string) => any | undefined;
+        skipUnknownRefs?: boolean;
     } = {}
-) : JSONSchema4 | JSONSchema6 {
+): JSONSchema4 | JSONSchema6 {
     const refResolver = options.resolveRef || resolveRef.bind(null, document);
     return extractSchemaPriv(subtreeRef, refResolver, options, undefined);
 }
