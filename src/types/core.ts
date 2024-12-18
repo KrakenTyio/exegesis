@@ -21,27 +21,27 @@ export interface ExegesisResponse {
     connection: net.Socket;
     ended: boolean;
 
-    setStatus(status: number) : this;
-    status(status: number) : this;
-    setBody(body: any) : this;
+    setStatus(status: number): this;
+    status(status: number): this;
+    setBody(body: any): this;
 
     /**
      * Set the value of a header.
      * @param header - the header to set.
      * @param value - the value to set the header to.
      */
-    header(header: string, value: number | string | string[] | undefined) : this;
-    set(header: string, value: number | string | string[] | undefined) : this;
-    json(json: any) : this;
+    header(header: string, value: number | string | string[] | undefined): this;
+    set(header: string, value: number | string | string[] | undefined): this;
+    json(json: any): this;
     end(): void;
-    setHeader(name: string, value: number | string | string[] | undefined) : void;
-    getHeader(name: string) : number | string | string[] | undefined;
-    getHeaderNames() : string[];
-    getHeaders() : HttpHeaders;
-    hasHeader(name: string) : boolean;
-    removeHeader(name: string) : void;
-    writeHead(statusCode: number, headers?: HttpHeaders) : void;
-    writeHead(statusCode: number, statusMessage?: string, headers?: HttpHeaders) : void;
+    setHeader(name: string, value: number | string | string[] | undefined): void;
+    getHeader(name: string): number | string | string[] | undefined;
+    getHeaderNames(): string[];
+    getHeaders(): HttpHeaders;
+    hasHeader(name: string): boolean;
+    removeHeader(name: string): void;
+    writeHead(statusCode: number, headers?: HttpHeaders): void;
+    writeHead(statusCode: number, statusMessage?: string, headers?: HttpHeaders): void;
 }
 
 export interface ExegesisContextBase {
@@ -49,17 +49,17 @@ export interface ExegesisContextBase {
     readonly origRes: http.ServerResponse;
     readonly res: ExegesisResponse;
     api: any;
-    security?: {[scheme: string]: AuthenticationSuccess};
+    security?: { [scheme: string]: AuthenticationSuccess };
     user?: any;
     parameterLocations?: ParameterLocations;
 
-    makeError(statusCode: number, message: string) : Error;
-    makeValidationError(message: string, parameterLocation: ParameterLocation) : Error;
+    makeError(statusCode: number, message: string): Error;
+    makeValidationError(message: string, parameterLocation: ParameterLocation): Error;
 
     /**
      * Returns true if the response has already been sent.
      */
-    isResponseFinished() : boolean;
+    isResponseFinished(): boolean;
 }
 
 export interface ExegesisContext extends ExegesisContextBase {
@@ -70,10 +70,10 @@ export interface ExegesisContext extends ExegesisContextBase {
 }
 
 export interface ExegesisPluginContext extends ExegesisContextBase {
-    getParams() : Promise<ParametersByLocation<ParametersMap<any>>>;
-    getParams(done: Callback<ParametersByLocation<ParametersMap<any>>>) : void;
-    getRequestBody() : Promise<any>;
-    getRequestBody(done: Callback<any>) : void;
+    getParams(): Promise<ParametersByLocation<ParametersMap<any>>>;
+    getParams(done: Callback<ParametersByLocation<ParametersMap<any>>>): void;
+    getRequestBody(): Promise<any>;
+    getRequestBody(done: Callback<any>): void;
 }
 
 export interface OAS3ApiInfo {
@@ -102,24 +102,24 @@ export interface Controllers {
 }
 
 export interface AuthenticationFailure {
-    type: "invalid" | "missing";
+    type: 'invalid' | 'missing';
     status?: number;
     message?: string;
     challenge?: string;
 }
 
 export interface AuthenticationSuccess {
-    type: "success";
+    type: 'success';
     user?: any;
-    roles? : string[] | undefined;
-    scopes? : string[] | undefined;
+    roles?: string[] | undefined;
+    scopes?: string[] | undefined;
     [name: string]: any;
 }
 
 export type AuthenticationResult = AuthenticationSuccess | AuthenticationFailure;
 
 export interface AuthenticatorInfo {
-    in?: "query" | "header" | "cookie";
+    in?: 'query' | 'header' | 'cookie';
     name?: string;
     scheme?: string;
 }
@@ -160,11 +160,12 @@ export type ExegesisRunner = (
     ctx: KoaContext
 ) => Promise<HttpResult | undefined>;
 
-export type ParsedParameterValidator =
-    (parameterValues: ParametersByLocation<ParametersMap<any>>) => IValidationError[] | null;
+export type ParsedParameterValidator = (
+    parameterValues: ParametersByLocation<ParametersMap<any>>
+) => IValidationError[] | null;
 
 export interface ResolvedOperation {
-    parseParameters: (() => ParametersByLocation<ParametersMap<any>>);
+    parseParameters: () => ParametersByLocation<ParametersMap<any>>;
     validateParameters: ParsedParameterValidator;
     parameterLocations: ParameterLocations;
     bodyParser: BodyParser | undefined;
@@ -180,7 +181,9 @@ export interface ResolvedOperation {
     ): ResponseValidationResult;
 
     // Returns the authentication data, or undefined if user could not be authenticated.
-    authenticate(context: ExegesisContext): Promise<{ [scheme: string]: AuthenticationSuccess } | undefined>;
+    authenticate(
+        context: ExegesisContext
+    ): Promise<{ [scheme: string]: AuthenticationSuccess } | undefined>;
 }
 
 export interface ResolvedPath<T> {
@@ -216,8 +219,8 @@ export interface ExegesisPluginInstance {
      * @param data.apiDoc - the API document.
      */
     preCompile?:
-        ((data: {apiDoc: any}) => void | Promise<void>) |
-        ((data: {apiDoc: any}, done: Callback<void>) => void);
+        | ((data: { apiDoc: any }) => void | Promise<void>)
+        | ((data: { apiDoc: any }, done: Callback<void>) => void);
 
     /**
      * Called immediately after the routing phase.  Note that this is
@@ -235,8 +238,8 @@ export interface ExegesisPluginInstance {
      * @param pluginContext - the plugin context.
      */
     postRouting?:
-        ((pluginContext: ExegesisPluginContext) => void | Promise<void>) |
-        ((pluginContext: ExegesisPluginContext, done: Callback<void>) => void);
+        | ((pluginContext: ExegesisPluginContext) => void | Promise<void>)
+        | ((pluginContext: ExegesisPluginContext, done: Callback<void>) => void);
 
     /**
      * Called for each request, after security phase and before input
@@ -251,8 +254,16 @@ export interface ExegesisPluginInstance {
      * @param pluginContext - the plugin context.
      */
     postSecurity?:
-        ((pluginContext: ExegesisPluginContext) => void | Promise<void>) |
-        ((pluginContext: ExegesisPluginContext, done: Callback<void>) => void);
+        | ((pluginContext: ExegesisPluginContext) => void | Promise<void>)
+        | ((pluginContext: ExegesisPluginContext, done: Callback<void>) => void);
+
+    /**
+     * Called for each request, after the request body has been parsed.
+     * Used for example for getting lang from body.
+     */
+    postBodyParsed?:
+        | ((pluginContext: ExegesisPluginContext) => void | Promise<void>)
+        | ((pluginContext: ExegesisPluginContext, done: Callback<void>) => void);
 
     /**
      * Called immediately after the controller has been run, but before
@@ -265,13 +276,13 @@ export interface ExegesisPluginInstance {
      * @param context - The exegesis plugin context.
      */
     postController?:
-        ((pluginContext: ExegesisContext) => void | Promise<void>) |
-        ((pluginContext: ExegesisContext, done: Callback<void>) => void);
+        | ((pluginContext: ExegesisContext) => void | Promise<void>)
+        | ((pluginContext: ExegesisContext, done: Callback<void>) => void);
 }
 
 export interface ExegesisPlugin {
     info: {
-        name: string
+        name: string;
     };
-    makeExegesisPlugin(data: {apiDoc: any}) : ExegesisPluginInstance;
+    makeExegesisPlugin(data: { apiDoc: any }): ExegesisPluginInstance;
 }
