@@ -1,5 +1,6 @@
-import { StringParser, BodyParser } from './bodyParser';
-import { Controllers, Authenticators, ExegesisPlugin } from './core';
+import * as http from 'http';
+import { BodyParser, StringParser } from './bodyParser';
+import { Authenticators, Controllers, ExegesisPlugin } from './core';
 import { ResponseValidationCallback } from './validation';
 
 /**
@@ -7,10 +8,10 @@ import { ResponseValidationCallback } from './validation';
  */
 export type CustomFormatChecker = RegExp | ((value: string) => boolean);
 
-export type handleErrorFunction = (err: Error) => any;
+export type HandleErrorFunction = (err: Error, context: { req: http.IncomingMessage }) => any;
 
 export interface StringCustomFormatChecker {
-    type: 'string';
+    type?: 'string' | undefined;
     validate: CustomFormatChecker;
 }
 
@@ -27,6 +28,7 @@ export interface NumberCustomFormatChecker {
  *     false the the string is invalid.
  *   * A `{validate, type}` object, where `type` is either "string" or "number",
  *     and validate is a `function(string) : boolean`.
+ *   * Any `ajv` format.
  */
 export interface CustomFormats {
     [key: string]: CustomFormatChecker | StringCustomFormatChecker | NumberCustomFormatChecker;
@@ -108,7 +110,7 @@ export interface ExegesisOptions {
      * replies with appropriate error messages.  If you want to handle these errors
      * yourself, set this value to false.  Defaults to true. TODO
      */
-    autoHandleHttpErrors?: boolean | handleErrorFunction;
+    autoHandleHttpErrors?: boolean | HandleErrorFunction;
 
     /**
      * If you provide this function, Exegesis will validate responses controllers
@@ -150,6 +152,25 @@ export interface ExegesisOptions {
      * processing invalid requests.
      */
     allErrors?: boolean;
+
+    /**
+     * If true, then when a controller returns a JSON object, exegesis will call
+     * `context.res.pureJson(val)` to set the body of the response.  If false, exegesis
+     * will call `context.res.json(val)`.
+     */
+    treatReturnedJsonAsPure?: boolean;
+
+    /**
+     * If true, then this will put ajv into "strict mode" (see https://ajv.js.org/strict-mode.html).
+     */
+    strictValidation?: boolean;
+
+    /**
+     * Response and request schemas are compiled by ajv to make validation faster. However compilation is slow
+     * and can cause compilation of API to take long time. Enabling this will cause validation schemas
+     * compilation to be executed when the validator is needed.
+     */
+    lazyCompileValidationSchemas?: boolean;
 
     /**
      * Defaults

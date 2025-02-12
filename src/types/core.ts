@@ -5,12 +5,16 @@ import { Context as KoaContext } from 'koa';
 
 import { Callback, ParametersByLocation, ParametersMap, HttpIncomingMessage } from './basicTypes';
 import { Readable } from 'stream';
-import { ParameterLocations, ParameterLocation, ExegesisOptions } from '.';
+import { ExegesisOptions, ParameterLocation, ParameterLocations } from '.';
 import { BodyParser } from './bodyParser';
-import { IValidationError, ValidatorFunction, ResponseValidationResult } from './validation';
+import { IValidationError, ResponseValidationResult, ValidatorFunction } from './validation';
 
 export interface HttpHeaders {
     [header: string]: number | string | string[];
+}
+
+export interface ExegesisRoute {
+    path: string;
 }
 
 export interface ExegesisResponse {
@@ -19,6 +23,7 @@ export interface ExegesisResponse {
     headers: HttpHeaders;
     body: Buffer | string | Readable | any;
     connection: net.Socket;
+    socket: net.Socket;
     ended: boolean;
 
     setStatus(status: number): this;
@@ -32,8 +37,24 @@ export interface ExegesisResponse {
      */
     header(header: string, value: number | string | string[] | undefined): this;
     set(header: string, value: number | string | string[] | undefined): this;
+    /**
+     * Set the JSON content of the response.  Note that this will call `JSON.stringify()`
+     * immediately if response validation is enabled, because there may be `toJSON()`
+     * functions on the object or any nested values (e.g. if some values are Mongoose objects).
+     * This means we'll need to parse that string to do validation though.  If you
+     * know your object is a pure POJO, call `res.pureJson()` instead.
+     */
     json(json: any): this;
+    /**
+     * Sets the JSON content of the response to the object provided.  Note that
+     * while `toJSON()` on the object or any child objects will be
+     * respsected when the object is serialized, it will be ignored for purposes
+     * of response validation.
+     */
+    pureJson(json: any): this;
     end(): void;
+    redirect(status: number, url: string): this;
+    redirect(url: string): this;
     setHeader(name: string, value: number | string | string[] | undefined): void;
     getHeader(name: string): number | string | string[] | undefined;
     getHeaderNames(): string[];
@@ -67,6 +88,8 @@ export interface ExegesisContext extends ExegesisContextBase {
     params: ParametersByLocation<ParametersMap<any>>;
     requestBody: any;
     options: ExegesisOptions;
+    route: ExegesisRoute;
+    baseUrl: string;
 }
 
 export interface ExegesisPluginContext extends ExegesisContextBase {
@@ -189,6 +212,17 @@ export interface ResolvedOperation {
 export interface ResolvedPath<T> {
     operation: ResolvedOperation | undefined;
     api: T;
+    /** List of methods the client is allowed to send to this path.  e.g. `['get', 'post']`. */
+    allowedMethods: string[];
+    /** The path of the operation being accessed.  e.g. "/users/1234". */
+    path: string;
+    /**
+     * The "base" of the `path`.  `${baseUrl}${path}` represents the full
+     * URL being accessed.  For OAS3, for example you can set a URL like
+     * `https://myserver.com/v1` in the `Server` object, which would be reflected
+     * here.
+     */
+    baseUrl: string;
 }
 
 // ApiInterface provides an interface into the `oas3` subdirectory.  The idea here is,
@@ -221,6 +255,17 @@ export interface ExegesisPluginInstance {
     preCompile?:
         | ((data: { apiDoc: any }) => void | Promise<void>)
         | ((data: { apiDoc: any }, done: Callback<void>) => void);
+
+    /**
+     * Called before routing.  Note that the context hasn't been created yet,
+     * so you just get a raw `req` and `res` object here.
+     */
+    preRouting?:
+        | ((data: { req: http.IncomingMessage; res: http.ServerResponse }) => void | Promise<void>)
+        | ((
+              data: { req: http.IncomingMessage; res: http.ServerResponse },
+              done: Callback<void>
+          ) => void);
 
     /**
      * Called immediately after the routing phase.  Note that this is
@@ -276,6 +321,14 @@ export interface ExegesisPluginInstance {
      * @param context - The exegesis plugin context.
      */
     postController?:
+        | ((pluginContext: ExegesisContext) => void | Promise<void>)
+        | ((pluginContext: ExegesisContext, done: Callback<void>) => void);
+
+    /**
+     * Called after the response validation step.  This is the last step before
+     * the response is converted to JSON and written to the output.
+     */
+    postResponseValidation?:
         | ((pluginContext: ExegesisContext) => void | Promise<void>)
         | ((pluginContext: ExegesisContext, done: Callback<void>) => void);
 }

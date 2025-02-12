@@ -1,15 +1,17 @@
-import {escapeRegExp} from 'lodash';
+import { escapeRegExp } from 'lodash';
 const TEMPLATE_RE = /^(.*?){(.*?)}(.*)$/;
 
 import { ParametersMap } from '../../types';
 
-export type PathParserFunction = (pathname: string) => {matched: string, rawPathParams: ParametersMap<any>} | null;
+export type PathParserFunction = (
+    pathname: string
+) => { matched: string; rawPathParams: ParametersMap<any> } | null;
 
 /**
  * @param path - The path to check.
  * @returns true if the specified path uses templating, false otherwise.
  */
-export function hasTemplates(path: string) : boolean {
+export function hasTemplates(path: string): boolean {
     return !!TEMPLATE_RE.exec(path);
 }
 
@@ -35,27 +37,27 @@ export function hasTemplates(path: string) : boolean {
 export function compileTemplatePath(
     path: string,
     options: {
-        openEnded?: boolean
+        openEnded?: boolean;
     } = {}
-) : {
-    params: string[],
-    regex: RegExp,
-    parser: PathParserFunction
+): {
+    params: string[];
+    regex: RegExp;
+    parser: PathParserFunction;
 } {
-    const params : string[] = [];
+    const params: string[] = [];
 
     // Split up the path at each parameter.
-    const regexParts : string[] = [];
+    const regexParts: string[] = [];
     let remainingPath = path;
     let tempateMatch;
     do {
         tempateMatch = TEMPLATE_RE.exec(remainingPath);
-        if(tempateMatch) {
+        if (tempateMatch) {
             regexParts.push(tempateMatch[1]);
             params.push(tempateMatch[2]);
             remainingPath = tempateMatch[3];
         }
-    } while(tempateMatch);
+    } while (tempateMatch);
     regexParts.push(remainingPath);
 
     const regexStr = regexParts.map(escapeRegExp).join('([^/]*)');
@@ -63,7 +65,7 @@ export function compileTemplatePath(
 
     const parser = (urlPathname: string) => {
         const match = regex.exec(urlPathname);
-        if(match) {
+        if (match) {
             return {
                 matched: match[0],
                 rawPathParams: params.reduce(
@@ -72,23 +74,27 @@ export function compileTemplatePath(
                         return result;
                     },
                     {}
-                )
+                ),
             };
         } else {
             return null;
         }
     };
 
-    return {regex, params, parser};
+    return { regex, params, parser };
 }
 
 export default class PathResolver<T> {
     // Static paths with no templating are stored in a hash, for easy lookup.
-    private readonly _staticPaths: {[key: string]: T};
+    private readonly _staticPaths: { [key: string]: T };
 
     // Paths with templates are stored in an array, with parser functions that
     // recognize the path.
-    private readonly _dynamicPaths: {parser: PathParserFunction, value: T}[];
+    private readonly _dynamicPaths: {
+        parser: PathParserFunction;
+        value: T;
+        path: string;
+    }[];
 
     // TODO: Pass in variable styles.  Some variable styles start with a special
     // character, and we can check to see if the character is there or not.
@@ -99,13 +105,13 @@ export default class PathResolver<T> {
     }
 
     registerPath(path: string, value: T) {
-        if(!path.startsWith('/')) {
+        if (!path.startsWith('/')) {
             throw new Error(`Invalid path "${path}"`);
         }
 
-        if(hasTemplates(path)) {
-            const {parser} = compileTemplatePath(path);
-            this._dynamicPaths.push({value, parser});
+        if (hasTemplates(path)) {
+            const { parser } = compileTemplatePath(path);
+            this._dynamicPaths.push({ value, parser, path });
         } else {
             this._staticPaths[path] = value;
         }
@@ -121,23 +127,26 @@ export default class PathResolver<T> {
      *   undefined if there was no match.
      */
     resolvePath(urlPathname: string) {
-        let value : T | undefined = this._staticPaths[urlPathname];
-        let rawPathParams : ParametersMap<string | string[]> | undefined;
+        let value: T | undefined = this._staticPaths[urlPathname];
+        let rawPathParams: ParametersMap<string | string[]> | undefined;
+        let path = urlPathname;
 
-        if(!value) {
-            for(const dynamicPath of this._dynamicPaths) {
+        if (!value) {
+            for (const dynamicPath of this._dynamicPaths) {
                 const matched = dynamicPath.parser(urlPathname);
-                if(matched) {
+                if (matched) {
                     value = dynamicPath.value;
                     rawPathParams = matched.rawPathParams;
+                    path = dynamicPath.path;
                 }
             }
         }
 
-        if(value) {
+        if (value) {
             return {
                 value,
-                rawPathParams
+                rawPathParams,
+                path,
             };
         } else {
             return undefined;

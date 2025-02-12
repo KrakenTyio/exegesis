@@ -1,5 +1,6 @@
 import * as http from 'http';
 import { Readable } from 'stream';
+import { asError, HttpError } from '../errors';
 import { Context as KoaContext } from 'koa';
 
 import { invokeController } from '../controllers/invoke';
@@ -20,7 +21,7 @@ import {
 import ExegesisContextImpl from './ExegesisContextImpl';
 import PluginsManager from './PluginsManager';
 import { IValidationError } from '../types/validation';
-import { handleErrorFunction } from '../types/options';
+import { HandleErrorFunction } from '../types/options';
 
 async function handleSecurity(operation: ResolvedOperation, context: ExegesisContext) {
     const authenticated = await operation.authenticate(context);
@@ -97,7 +98,7 @@ function handleError(err: Error) {
     } else if (Number.isInteger((err as any).status)) {
         return {
             status: (err as any).status,
-            headers: { 'content-type': 'application/json' },
+            headers: (err as any).headers || { 'content-type': 'application/json' },
             body: stringToStream(JSON.stringify({ message: err.message }), 'utf-8'),
         };
     } else {
@@ -115,9 +116,9 @@ function handleError(err: Error) {
 export default async function generateExegesisRunner<T>(
     api: ApiInterface<T>,
     options: {
-        autoHandleHttpErrors: boolean | handleErrorFunction;
+        autoHandleHttpErrors: boolean | HandleErrorFunction;
         plugins: PluginsManager;
-        onResponseValidationError: ResponseValidationCallback;
+        onResponseValidationError?: ResponseValidationCallback;
         validateDefaultResponses: boolean;
         originalOptions: ExegesisOptions;
     }
@@ -135,9 +136,22 @@ export default async function generateExegesisRunner<T>(
         let result: HttpResult | undefined;
 
         try {
+            await plugins.preRouting({ req, res });
+
             const resolved = api.resolve(method, url, req.headers);
             if (!resolved) {
                 return result;
+            }
+
+            if (!resolved.operation) {
+                const error: any = new Error(`Method ${method} not allowed for ${url}`);
+                error.status = 405;
+                error.headers = {
+                    allow: resolved.allowedMethods.join(',').toUpperCase(),
+                    'content-type': 'application/json',
+                };
+
+                return handleError(error);
             }
 
             const context = new ExegesisContextImpl<T>(
@@ -152,81 +166,79 @@ export default async function generateExegesisRunner<T>(
                 await plugins.postRouting(context);
             }
 
-            if (resolved.operation) {
-                const { operation } = resolved;
+            const { operation } = resolved;
 
-                context._setOperation(operation);
+            context._setOperation(resolved.baseUrl, resolved.path, operation);
 
-                if (!operation.controllerModule || !operation.controller) {
-                    throw new Error(`No controller found for ${method} ${url}`);
-                }
+            if (!operation.controller) {
+                throw new Error(`No controller found for ${method} ${url}`);
+            }
 
-                await handleSecurity(operation, context);
+            await handleSecurity(operation, context);
 
-                if (!context.isResponseFinished()) {
-                    await plugins.postSecurity(context);
-                }
+            if (!context.isResponseFinished()) {
+                await plugins.postSecurity(context);
+            }
 
-                if (!context.isResponseFinished()) {
-                    // Fill in context.params and context.requestBody.
-                    await context.getParams();
-                    await context.getRequestBody();
-                    await plugins.postBodyParsed(context);
-                }
+            if (!context.isResponseFinished()) {
+                // Fill in context.params and context.requestBody.
+                await context.getParams();
+                await context.getRequestBody();
+                await plugins.postBodyParsed(context);
+            }
 
-                if (!context.isResponseFinished()) {
-                    await invokeController(
-                        operation.controllerModule,
-                        operation.controller,
-                        context
+            if (!context.isResponseFinished()) {
+                await invokeController(operation.controllerModule, operation.controller, context);
+            }
+
+            if (!context.origRes.headersSent) {
+                // Set _afterController to allow postController() plugins to
+                // modify the response.
+                context.res._afterController = true;
+                await plugins.postController(context);
+            }
+
+            if (!context.origRes.headersSent) {
+                // Before response validation, if there is a body and no
+                // content-type has been set, set a reasonable default.
+                setDefaultContentType(context.res);
+
+                if (options.onResponseValidationError) {
+                    const responseValidationResult = resolved.operation.validateResponse(
+                        context.res,
+                        options.validateDefaultResponses
                     );
-                }
-
-                if (!context.origRes.headersSent) {
-                    // Set _afterController to allow postController() plugins to
-                    // modify the response.
-                    context.res._afterController = true;
-                    await plugins.postController(context);
-                }
-
-                if (!context.origRes.headersSent) {
-                    // Before response validation, if there is a body and no
-                    // content-type has been set, set a reasonable default.
-                    setDefaultContentType(context.res);
-
-                    if (options.onResponseValidationError) {
-                        const responseValidationResult = resolved.operation.validateResponse(
-                            context.res,
-                            options.validateDefaultResponses
-                        );
-                        try {
-                            if (
-                                responseValidationResult.errors &&
-                                responseValidationResult.errors.length
-                            ) {
-                                options.onResponseValidationError({
-                                    errors: responseValidationResult.errors,
-                                    isDefault: responseValidationResult.isDefault,
-                                    context,
-                                });
-                            }
-                        } catch (err: any) {
-                            err.status = err.status || 500;
-                            throw err;
+                    try {
+                        if (
+                            responseValidationResult.errors &&
+                            responseValidationResult.errors.length
+                        ) {
+                            options.onResponseValidationError({
+                                errors: responseValidationResult.errors,
+                                isDefault: responseValidationResult.isDefault,
+                                context,
+                            });
                         }
+                    } catch (e) {
+                        const err = asError(e) as HttpError;
+                        (err as any).status = err.status || 500;
+                        throw err;
                     }
                 }
+                await plugins.postResponseValidation(context);
+            }
 
-                if (!context.origRes.headersSent) {
-                    result = resultToHttpResponse(context, context.res.body);
-                }
+            if (!context.origRes.headersSent) {
+                result = resultToHttpResponse(context, context.res.body);
             }
 
             return result;
-        } catch (err: any) {
+        } catch (e) {
+            const err = asError(e);
+
             if (options.autoHandleHttpErrors) {
                 if (options.autoHandleHttpErrors instanceof Function) {
-                    return options.autoHandleHttpErrors(err);
+                    return options.autoHandleHttpErrors(err, { req });
                 }
                 return handleError(err);
             } else {
