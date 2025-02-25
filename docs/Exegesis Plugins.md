@@ -132,6 +132,22 @@ function makeExegesisPlugin({apiDoc}) {
     postSecurity(pluginContext) {
     }
 
+    // Called for each request, after security phase and before input
+    // is parsed and the controller is run.  This is a good place to
+    // do extra security checks.  The `exegesis-plugin-roles` plugin,
+    // for example, generates a 403 response here if the authenticated
+    // user has insufficient privliedges to access this path.
+    //
+    // Note that this function will not be called if a previous pluing
+    // has already written a response.
+    postSecurity(pluginContext) {
+    }
+
+    // Called for each request, after the request body has been parsed.
+    // Used for example for getting lang from body.
+    postBodyParsed(pluginContext) {
+    }
+
     // Called immediately after the controller has been run, but before
     // any response validation.  This is a good place to do custom
     // response validation.  If you have to deal with something weird

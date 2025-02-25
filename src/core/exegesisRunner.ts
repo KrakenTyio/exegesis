@@ -184,6 +184,7 @@ export default async function generateExegesisRunner<T>(
                 // Fill in context.params and context.requestBody.
                 await context.getParams();
                 await context.getRequestBody();
+                await plugins.postBodyParsed(context);
             }
 
             if (!context.isResponseFinished()) {

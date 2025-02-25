@@ -20,6 +20,7 @@ export default class PluginsManager {
     private readonly _preRoutingPlugins: exegesis.ExegesisPluginInstance[];
     private readonly _postRoutingPlugins: exegesis.ExegesisPluginInstance[];
     private readonly _postSecurityPlugins: exegesis.ExegesisPluginInstance[];
+    private readonly _postBodyParsedPlugins: exegesis.ExegesisPluginInstance[];
     private readonly _postControllerPlugins: exegesis.ExegesisPluginInstance[];
     private readonly _postResponseValidation: exegesis.ExegesisPluginInstance[];
 
@@ -29,6 +30,7 @@ export default class PluginsManager {
         this._preRoutingPlugins = this._plugins.filter((p) => !!p.preRouting);
         this._postRoutingPlugins = this._plugins.filter((p) => !!p.postRouting);
         this._postSecurityPlugins = this._plugins.filter((p) => !!p.postSecurity);
+        this._postBodyParsedPlugins = this._plugins.filter((p) => !!p.postBodyParsed);
         this._postControllerPlugins = this._plugins.filter((p) => !!p.postController);
         this._postResponseValidation = this._plugins.filter((p) => !!p.postResponseValidation);
     }
@@ -56,6 +58,12 @@ export default class PluginsManager {
     async postSecurity(pluginContext: exegesis.ExegesisPluginContext) {
         for (const plugin of this._postSecurityPlugins) {
             await callFn(plugin, 'postSecurity', pluginContext);
+        }
+    }
+
+    async postBodyParsed(pluginContext: exegesis.ExegesisPluginContext) {
+        for (const plugin of this._postBodyParsedPlugins) {
+            await callFn(plugin, 'postBodyParsed', pluginContext);
         }
     }
 

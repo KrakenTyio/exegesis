@@ -303,6 +303,14 @@ export interface ExegesisPluginInstance {
         | ((pluginContext: ExegesisPluginContext, done: Callback<void>) => void);
 
     /**
+     * Called for each request, after the request body has been parsed.
+     * Used for example for getting lang from body.
+     */
+    postBodyParsed?:
+        | ((pluginContext: ExegesisPluginContext) => void | Promise<void>)
+        | ((pluginContext: ExegesisPluginContext, done: Callback<void>) => void);
+
+    /**
      * Called immediately after the controller has been run, but before
      * any response validation.  This is a good place to do custom
      * response validation.  If you have to deal with something weird
